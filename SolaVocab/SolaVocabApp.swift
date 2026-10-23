@@ -2,7 +2,7 @@ import AVFoundation
 import SwiftUI
 
 @main
-struct VocabApp: App {
+struct SolaVocabApp: App {
     @State private var store = Store()
 
     init() {

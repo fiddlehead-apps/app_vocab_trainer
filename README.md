@@ -84,6 +84,11 @@ DEVICE_ID=<id> ../build-sola-apps.sh vocab
 Beide Geräte haben getrennte Daten (Wörter, Fortschritt, Sammlung); Testen auf dem eigenen
 iPhone verändert nichts beim Sohn.
 
+Bundle-ID und Team kommen aus `Config/Config.xcconfig` (`eu.fiddlehead.sola.vocab`, Projekt
+`SolaVocab.xcodeproj`). Bis Oktober 2026 hieß die App intern `org.christophschneider.vocab`:
+der erste Build mit der neuen ID installiert sich als **eigene App** daneben und fängt mit
+leeren Daten an. Die alte App mit Wörtern und Sammlung bleibt, bis man sie löscht.
+
 Für den Simulator: `../build-sola-apps.sh --sim vocab`. In Debug-Builds öffnet
 `-debugScreen practice-letters` (oder `scan`, `settings`, `reveal-tralalero`) direkt einen
 Bildschirm, für Screenshots.
