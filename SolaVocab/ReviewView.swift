@@ -74,7 +74,7 @@ struct ReviewView: View {
 
     private var nothingFound: some View {
         VStack(spacing: 14) {
-            Text("🔍").font(.system(size: 64))
+            SearchIllustration()
             Text("No text found")
                 .font(.system(size: 22, weight: .bold, design: .rounded))
                 .foregroundStyle(Color.ink)

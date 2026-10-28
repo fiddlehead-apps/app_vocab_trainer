@@ -71,8 +71,7 @@ struct ScanView: View {
     private var pickView: some View {
         ScrollView {
             VStack(spacing: 14) {
-                Text("📸")
-                    .font(.system(size: 72))
+                BookIllustration()
                     .padding(.top, 24)
                 Text("Take a photo of English text")
                     .font(.system(size: 24, weight: .bold, design: .rounded))

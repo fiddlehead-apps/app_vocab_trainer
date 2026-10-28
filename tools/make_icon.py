@@ -1,107 +1,109 @@
 """Erzeugt das App-Icon (1024 px) neu: python3 tools/make_icon.py
 
-Offenes Buch mit Sprechblase "Aa" auf Traubenlila, im flachen Stil der anderen Sola-Icons.
-Braucht Pillow.
+Offenes Buch, aus dessen Bund ein Farn wächst.
+Sola-Iconstil: weiße, schlanke Linie auf der Leitfarbe der App; genau eine Linie
+läuft in eine Farnspirale (Fiddlehead) aus. Braucht Pillow.
 """
 import math
 import os
 
 from PIL import Image, ImageDraw
 
-OUT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                   'SolaVocab', 'Assets.xcassets', 'AppIcon.appiconset', 'icon-1024.png')
-SS = 4
-
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+OUTS = [
+    os.path.join(ROOT, 'SolaVocab/Assets.xcassets/AppIcon.appiconset/icon-1024.png'),
+]
 BRAND = '#6C47FF'
-PAGE = '#FFFFFF'
-PAGE_SHADE = '#E4DCFF'
-SPINE = '#3D22B8'
-BUBBLE = '#FFC857'
-LETTER = '#3D22B8'
+
+SS = 4
+SW = 30  # Strichstärke auf der 1024er-Fläche
+INK = '#FFFFFF'
 
 
-def rrect(x0, y0, x1, y1, r, steps=12):
-    pts = []
-    for cx, cy, start in ((x1 - r, y0 + r, -90), (x1 - r, y1 - r, 0), (x0 + r, y1 - r, 90), (x0 + r, y0 + r, 180)):
-        for i in range(steps + 1):
-            a = math.radians(start + 90 * i / steps)
-            pts.append((cx + r * math.cos(a), cy + r * math.sin(a)))
-    return pts
+class Pen:
+    """Sammelt Linienzüge; Kurven werden beim Zeichnen in Punkte aufgelöst."""
+
+    def __init__(self):
+        self.lines = []
+
+    def move(self, x, y):
+        self.lines.append([(x, y)])
+        return self
+
+    def line(self, *pts):
+        for i in range(0, len(pts), 2):
+            self.lines[-1].append((pts[i], pts[i + 1]))
+        return self
+
+    def curve(self, x1, y1, x2, y2, x, y, steps=40):
+        (x0, y0) = self.lines[-1][-1]
+        for i in range(1, steps + 1):
+            t = i / steps
+            a, b, c, d = (1 - t) ** 3, 3 * (1 - t) ** 2 * t, 3 * (1 - t) * t ** 2, t ** 3
+            self.lines[-1].append((a * x0 + b * x1 + c * x2 + d * x, a * y0 + b * y1 + c * y2 + d * y))
+        return self
+
+    def quad(self, cx, cy, x, y, steps=20):
+        (x0, y0) = self.lines[-1][-1]
+        for i in range(1, steps + 1):
+            t = i / steps
+            a, b, c = (1 - t) ** 2, 2 * (1 - t) * t, t ** 2
+            self.lines[-1].append((a * x0 + b * cx + c * x, a * y0 + b * cy + c * y))
+        return self
+
+    def close(self):
+        self.lines[-1].append(self.lines[-1][0])
+        return self
+
+    def spiral(self, x, y, heading, r, turns=3, left=False, steps=60):
+        """Farnspirale ab (x, y); heading in Grad, 0 = nach oben, im Uhrzeigersinn."""
+        h = math.radians(heading)
+        sx = -1 if left else 1
+        place = lambda px, py: (x + sx * px * math.cos(h) - py * math.sin(h),
+                                y + sx * px * math.sin(h) + py * math.cos(h))
+        pts, start = [place(0, 0)], 0.0
+        for i, f in enumerate((1, 0.64, 0.33, 0.12)[:turns]):
+            rr = r * f
+            cx, a0 = (start + rr, math.pi) if i % 2 == 0 else (start - rr, 0.0)
+            for k in range(1, steps + 1):
+                a = a0 + math.pi * k / steps
+                pts.append(place(cx + rr * math.cos(a), rr * math.sin(a)))
+            start = cx + rr * math.cos(a0 + math.pi)
+        self.lines.append(pts)
+        return self
 
 
-def quad(p0, c, p1, steps=20):
-    return [((1 - t) ** 2 * p0[0] + 2 * (1 - t) * t * c[0] + t ** 2 * p1[0],
-             (1 - t) ** 2 * p0[1] + 2 * (1 - t) * t * c[1] + t ** 2 * p1[1])
-            for t in (i / steps for i in range(steps + 1))]
+def heading(dx, dy):
+    return math.degrees(math.atan2(dx, -dy))
 
 
-def page(left):
-    # One page of the open book: curved top and bottom edge, meeting at the spine (x = 256).
-    s = -1 if left else 1
-    outer = 256 + s * 176
-    top = quad((256, 268), (256 + s * 90, 236), (outer, 250))
-    bottom = quad((outer, 420), (256 + s * 90, 406), (256, 438))
-    return top + bottom
+def render(motif, background, out, size=1024):
+    big = size * SS
+    k = big / 1024.0
+    w = SW * k
+    im = Image.new('RGB', (big, big), background)  # iOS rundet selbst ab, kein Alpha erlaubt
+    d = ImageDraw.Draw(im)
+    pen = Pen()
+    motif(pen)
+    for pts in pen.lines:
+        pts = [(x * k, y * k) for x, y in pts]
+        # Segment für Segment mit runden Gelenken; joint='curve' franst bei dicken Linien aus
+        for a, b in zip(pts, pts[1:]):
+            d.line((a, b), fill=INK, width=round(w))
+        for x, y in pts:
+            d.ellipse((x - w / 2, y - w / 2, x + w / 2, y + w / 2), fill=INK)
+    im.resize((size, size), Image.LANCZOS).save(out, optimize=True)
+    print('Icon geschrieben nach', out)
 
 
-def lines(left):
-    # Text lines on a page.
-    s = -1 if left else 1
-    out = []
-    for i, y in enumerate((300, 330, 360, 390)):
-        x0, x1 = 256 + s * 34, 256 + s * (150 if i % 2 == 0 else 120)
-        out.append(rrect(min(x0, x1), y - 5, max(x0, x1), y + 5, 5, 4))
-    return out
-
-
-def bubble():
-    body = rrect(176, 64, 336, 196, 40)
-    tail = [(226, 190), (210, 236), (266, 192)]
-    return body, tail
-
-
-def letter_a(x, y, h, w, stroke):
-    # Capital A: a lambda with a flat top plus a bar, polygons only (no font needed).
-    cx = x + w / 2
-    legs = [(x, y + h), (cx - stroke * 0.6, y), (cx + stroke * 0.6, y), (x + w, y + h), (x + w - stroke, y + h),
-            (cx, y + stroke * 1.9), (x + stroke, y + h)]
-    by = y + h * 0.6
-    bar = [(x + w * 0.24, by), (x + w * 0.76, by), (x + w * 0.8, by + stroke * 0.8), (x + w * 0.2, by + stroke * 0.8)]
-    return [legs, bar]
-
-
-def letter_small_a(cx, cy, r, stroke, steps=40):
-    # Lowercase a: a ring plus a stem on the right.
-    outer = [(cx + r * math.cos(2 * math.pi * i / steps), cy + r * math.sin(2 * math.pi * i / steps)) for i in range(steps)]
-    inner = [(cx + (r - stroke) * math.cos(2 * math.pi * i / steps), cy + (r - stroke) * math.sin(2 * math.pi * i / steps))
-             for i in range(steps)]
-    stem = rrect(cx + r - stroke, cy - r, cx + r, cy + r, stroke / 2, 4)
-    return outer, inner, stem
+def motif(p):
+    p.move(512, 500).curve(440, 462, 340, 448, 220, 460).line(220, 760).curve(340, 750, 440, 762, 512, 800)
+    p.curve(584, 762, 684, 750, 804, 760).line(804, 460).curve(684, 448, 584, 462, 512, 500).close()
+    p.move(512, 500).line(512, 800)  # Bund
+    p.move(512, 500).curve(512, 420, 520, 360, 556, 300)
+    p.spiral(556, 300, heading(36, -60), r=96, left=True)
 
 
 if __name__ == '__main__':
-    size = 1024
-    big = size * SS
-    k = big / 512.0
-    place = lambda pts: [(x * k, y * k) for x, y in pts]
-    im = Image.new('RGB', (big, big), BRAND)  # iOS rundet selbst ab, kein Alpha erlaubt
-    d = ImageDraw.Draw(im)
-
-    d.polygon(place(rrect(244, 262, 268, 446, 10)), fill=SPINE)
-    for left in (True, False):
-        d.polygon(place(page(left)), fill=PAGE)
-        for line in lines(left):
-            d.polygon(place(line), fill=PAGE_SHADE)
-
-    body, tail = bubble()
-    d.polygon(place(body), fill=BUBBLE)
-    d.polygon(place(tail), fill=BUBBLE)
-    for part in letter_a(206, 92, 78, 62, 17):
-        d.polygon(place(part), fill=LETTER)
-    outer, inner, stem = letter_small_a(288, 146, 25, 14)
-    d.polygon(place(outer), fill=LETTER)
-    d.polygon(place(inner), fill=BUBBLE)
-    d.polygon(place(stem), fill=LETTER)
-
-    im.resize((size, size), Image.LANCZOS).save(OUT, optimize=True)
-    print('Icon geschrieben nach', OUT)
+    for out in OUTS:
+        render(motif, BRAND, out)

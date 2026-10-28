@@ -112,7 +112,8 @@ struct HomeView: View {
 
     private var emptyState: some View {
         VStack(spacing: 10) {
-            Text("📖").font(.system(size: 54))
+            BookIllustration(width: 96)
+                .padding(.bottom, 6)
             Text("No words yet")
                 .font(.system(size: 20, weight: .bold, design: .rounded))
                 .foregroundStyle(Color.ink)
